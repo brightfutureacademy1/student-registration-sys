@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI School Registration System</title>
+<style>
+body{
+    font-family: Arial, sans-serif;
+    background:#f2f2f2;
+}
+.container{
+    width:95%;
+    max-width:600px;
+    margin:20px auto;
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 0 10px gray;
+}
+h2{
+    text-align:center;
+}
+input, select, button{
+    width:100%;
+    padding:8px;
+    margin:6px 0;
+}
+button{
+    background:green;
+    color:white;
+    border:none;
+    cursor:pointer;
+}
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:10px;
+}
+th, td{
+    border:1px solid #ccc;
+    padding:8px;
+    text-align:center;
+}
+img{
+    width:50px;
+    height:50px;
+    border-radius:50%;
+}
+.chatbot-btn{
+    position:fixed;
+    bottom:20px;
+    right:20px;
+    background:#007bff;
+    color:white;
+    border:none;
+    padding:12px;
+    border-radius:50%;
+}
+#chatbox{
+    display:none;
+    position:fixed;
+    bottom:80px;
+    right:20px;
+    width:300px;
+    background:white;
+    box-shadow:0 0 10px gray;
+    border-radius:10px;
+    padding:10px;
+}
+#messages{
+    height:200px;
+    overflow-y:auto;
+    border:1px solid #ccc;
+    padding:5px;
+    margin-bottom:5px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h2>AI School Registration System</h2>
+
+<label>Full Name</label>
+<input type="text" id="name">
+
+<label>Student ID</label>
+<input type="text" id="studentId">
+
+<label>Department</label>
+<select id="department">
+<option value="1500">Computer Science (1500 birr/course)</option>
+<option value="1200">Civil Engineering (1200 birr/course)</option>
+<option value="1000">Business (1000 birr/course)</option>
+</select>
+
+<label>Number of Courses</label>
+<input type="number" id="courses" oninput="calculateTotal()">
+
+<label>Registration Fee (Fixed)</label>
+<input type="text" value="500 birr" readonly>
+
+<div class="result">
+Total Fee: <span id="total">0</span> birr
+</div>
+
+<label>Upload Photo</label>
+<input type="file" id="photo">
+
+<button onclick="registerStudent()">Register Student</button>
+
+<table>
+<thead>
+<tr>
+<th>Photo</th>
+<th>Name</th>
+<th>ID</th>
+<th>Department</th>
+<th>Courses</th>
+<th>Total Fee</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="studentTable"></tbody>
+</table>
+</div>
+
+<!-- CHATBOT BUTTON -->
+<button class="chatbot-btn" onclick="toggleChat()">💬</button>
+
+<!-- CHATBOX -->
+<div id="chatbox">
+<div id="messages"></div>
+<input type="text" id="userInput" placeholder="Ask something..." onkeydown="if(event.key==='Enter') sendMessage()">
+<button onclick="sendMessage()">Send</button>
+<button onclick="startListening()" style="background:green;color:white;">🎤 Speak</button>
+</div>
+
+<script>
+// =================== REGISTRATION & CALCULATION ===================
+let students = JSON.parse(localStorage.getItem("students")) || [];
+
+function calculateTotal(){
+    let deptFee = parseInt(document.getElementById("department").value);
+    let courses = parseInt(document.getElementById("courses").value) || 0;
+    let registrationFee = 500;
+    let total = (deptFee * courses) + registrationFee;
+    document.getElementById("total").innerText = total;
+}
+
+function displayStudents(){
+    let table = document.getElementById("studentTable");
+    table.innerHTML = "";
+    students.forEach((s, i)=>{
+        table.innerHTML += `
+        <tr>
+            <td><img src="${s.photo}"></td>
+            <td>${s.name}</td>
+            <td>${s.id}</td>
+            <td>${s.department}</td>
+            <td>${s.courses}</td>
+            <td>${s.total}</td>
+            <td><button onclick="deleteStudent(${i})" style="background:red;">Delete</button></td>
+        </tr>`;
+    });
+}
+
+function registerStudent(){
+    let name = document.getElementById("name").value;
+    let studentId = document.getElementById("studentId").value;
+    let department = document.getElementById("department").selectedOptions[0].text;
+    let deptFee = parseInt(document.getElementById("department").value);
+    let courses = parseInt(document.getElementById("courses").value) || 0;
+    let registrationFee = 500;
+    let total = (deptFee * courses) + registrationFee;
+    let photoInput = document.getElementById("photo");
+
+    if(!name || !studentId || !courses || !photoInput.files.length){
+        alert("Please fill all fields and upload photo");
+        return;
+    }
+
+    let reader = new FileReader();
+    reader.onload = function(){
+        students.push({
+            name, id: studentId, department, courses, total, photo: reader.result
+        });
+        localStorage.setItem("students", JSON.stringify(students));
+        displayStudents();
+    };
+    reader.readAsDataURL(photoInput.files[0]);
+
+    // Clear inputs
+    document.getElementById("name").value="";
+    document.getElementById("studentId").value="";
+    document.getElementById("courses").value="";
+    document.getElementById("photo").value="";
+    document.getElementById("total").innerText="0";
+}
+
+function deleteStudent(index){
+    students.splice(index,1);
+    localStorage.setItem("students", JSON.stringify(students));
+    displayStudents();
+}
+
+displayStudents();
+
+// =================== CHATBOT & VOICE ===================
+function toggleChat(){
+    let box = document.getElementById("chatbox");
+    box.style.display = box.style.display === "none" ? "block" : "none";
+}
+
+function sendMessage(){
+    let input = document.getElementById("userInput");
+    let msg = input.value.toLowerCase();
+    let messages = document.getElementById("messages");
+    if(!msg) return;
+
+    messages.innerHTML += `<div><b>You:</b> ${msg}</div>`;
+    let reply = getBotReply(msg);
+    messages.innerHTML += `<div style="color:blue;"><b>Bot:</b> ${reply}</div>`;
+    speak(reply);
+    input.value="";
+    messages.scrollTop = messages.scrollHeight;
+}
+
+function getBotReply(msg){
+    if(msg.includes("hello") || msg.includes("hi")) return "Hello! How can I help you?";
+    if(msg.includes("fee")) return "The registration fee is 500 birr plus course fee.";
+    if(msg.includes("department")) return "Departments: Computer Science, Civil Engineering, Business.";
+    if(msg.includes("total")) return "The total fee is calculated based on department and number of courses.";
+    return "Sorry, I don't understand. Ask about fee, department, or total.";
+}
+
+// =================== VOICE INPUT ===================
+function startListening(){
+    if(!('webkitSpeechRecognition' in window)){
+        alert("Speech recognition not supported");
+        return;
+    }
+    let recognition = new webkitSpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.start();
+
+    recognition.onresult = function(event){
+        let speechText = event.results[0][0].transcript;
+        document.getElementById("userInput").value = speechText;
+        sendMessage();
+    };
+}
+
+function speak(text){
+    if('speechSynthesis' in window){
+        let speech = new SpeechSynthesisUtterance(text);
+        speech.lang = "en-US";
+        window.speechSynthesis.speak(speech);
+    }
+}
+</script>
+
+</body>
+</html>
